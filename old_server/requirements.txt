@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+scipy
+tweepy
+javascript
+yagmail
+motor
+pytube

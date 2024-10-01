@@ -1,0 +1,9 @@
+{
+    "dependencies": {
+        "node-cron": "",
+        "uuid": ""
+    },
+    "scripts": {
+        "start": "python main.py"
+    }
+}
