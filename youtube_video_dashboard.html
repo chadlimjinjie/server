@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube Video Dashboard</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-around;
+        }
+        .video-card {
+            width: 320px;
+            margin: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 180px;
+            border: none;
+            pointer-events: none; /* Make the iframe unhoverable */
+        }
+        .video-info {
+            padding: 10px;
+            text-align: center;
+        }
+        .add-video-form {
+            display: flex;
+            justify-content: center;
+            margin: 20px;
+        }
+        .add-video-form input {
+            width: 300px;
+            padding: 10px;
+            margin-right: 10px;
+        }
+        .add-video-form button {
+            padding: 10px 15px;
+            background-color: #28a745;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1 style="text-align: center; margin-top: 20px;">YouTube Video Dashboard</h1>
+
+    <!-- Form to Add New Video -->
+    <div class="add-video-form">
+        <input type="text" id="video-url" placeholder="Enter YouTube video URL" />
+        <input type="text" id="video-title" placeholder="Enter video title" />
+        <input type="text" id="video-description" placeholder="Enter video description" />
+        <button onclick="addNewVideo()">Add Video</button>
+    </div>
+    
+    <div id="video-container" class="container"></div>
+
+    <script>
+        async function fetchVideos() {
+            try {
+                // Replace this with your YouTube API call or your custom data
+                const response = await fetch('http://127.0.0.1/youtube/videos'); // Sample: '/api/videos'
+                const videos = await response.json();
+
+                const videoContainer = document.getElementById('video-container');
+                
+                videos.forEach(video => {
+                    createVideoCard(video);
+                });
+            } catch (error) {
+                console.error('Error fetching videos:', error);
+            }
+        }
+
+        // Function to create and display a video card
+        function createVideoCard(video) {
+            const videoContainer = document.getElementById('video-container');
+
+            const videoCard = document.createElement('div');
+            videoCard.classList.add('video-card');
+            
+            videoCard.innerHTML = `
+                <iframe src="https://www.youtube.com/embed/${video.videoId}?autoplay=1&mute=1" allow="autoplay" allowfullscreen></iframe>
+                <div class="video-info">
+                    <h3>${video.title}</h3>
+                    <p>${video.description}</p>
+                </div>
+            `;
+
+            // Add click event listener to go fullscreen and unmute
+            videoCard.addEventListener('click', function() {
+                const iframe = videoCard.querySelector('iframe');
+                
+                // Change iframe URL to unmute
+                iframe.src = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&mute=0`;
+
+                // Request fullscreen
+                if (iframe.requestFullscreen) {
+                    iframe.requestFullscreen();
+                } else if (iframe.mozRequestFullScreen) { // Firefox
+                    iframe.mozRequestFullScreen();
+                } else if (iframe.webkitRequestFullscreen) { // Chrome, Safari, and Opera
+                    iframe.webkitRequestFullscreen();
+                } else if (iframe.msRequestFullscreen) { // IE/Edge
+                    iframe.msRequestFullscreen();
+                }
+
+
+                // Listen for fullscreen exit and mute video when exiting fullscreen
+                document.addEventListener('fullscreenchange', function() {
+                    if (!document.fullscreenElement) {
+                        // If no fullscreen element, we have exited fullscreen
+                        iframe.src = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&mute=1`;
+                    }
+                });
+
+                // For WebKit browsers (Safari)
+                document.addEventListener('webkitfullscreenchange', function() {
+                    if (!document.webkitFullscreenElement) {
+                        iframe.src = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&mute=1`;
+                    }
+                });
+
+                // For Mozilla browsers (Firefox)
+                document.addEventListener('mozfullscreenchange', function() {
+                    if (!document.mozFullScreenElement) {
+                        iframe.src = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&mute=1`;
+                    }
+                });
+
+                // For IE/Edge browsers
+                document.addEventListener('msfullscreenchange', function() {
+                    if (!document.msFullscreenElement) {
+                        iframe.src = `https://www.youtube.com/embed/${video.videoId}?autoplay=1&mute=1`;
+                    }
+                });
+
+            });
+
+            videoContainer.appendChild(videoCard);
+        }
+
+        // Function to post a new video to the server
+        async function postNewVideo(video) {
+            try {
+                const response = await fetch('http://127.0.0.1/youtube/add_new_video', { // Replace with your server URL
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(video),
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Server error: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                console.log('Video posted successfully:', data);
+
+                // Optionally, you could add the new video to the dashboard after posting
+                createVideoCard(video); // Assuming video is the object with videoId, title, and description
+            } catch (error) {
+                console.error('Error posting the video:', error);
+                alert('Failed to post video to the server.');
+            }
+        }
+
+        // Function to add a new video
+        async function addNewVideo() {
+            const videoUrl = document.getElementById('video-url').value;
+            const videoTitle = document.getElementById('video-title').value;
+            const videoDescription = document.getElementById('video-description').value;
+            const videoId = extractVideoId(videoUrl);
+
+            if (videoId && videoTitle || videoDescription) {
+                // Simulate an HTTP POST request to add the new video (replace with actual server API request)
+                const newVideo = {
+                    videoId: videoId,
+                    title: videoTitle,
+                    description: videoDescription
+                };
+
+                // Add the new video to the dashboard
+                // createVideoCard(newVideo);
+
+                // Post the video to the server
+                await postNewVideo(newVideo);
+
+                // Clear the input fields
+                document.getElementById('video-url').value = '';
+                document.getElementById('video-title').value = '';
+                document.getElementById('video-description').value = '';
+            } else {
+                alert('Please enter a valid YouTube video URL, title, and description.');
+            }
+        }
+
+        // Function to extract video ID from YouTube URL
+        function extractVideoId(url) {
+            const regex = /(?:https?:\/\/)?(?:www\.)?youtube\.com\/(?:watch\?v=|embed\/|v\/|.+\?v=)?([^&\n?#]+)/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        }
+
+        fetchVideos();
+    </script>
+</body>
+</html>
