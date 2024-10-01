@@ -5,18 +5,6 @@ import aiohttp
 from pydantic import BaseModel
 
 
-# async def get_traffic_images():
-#     async with aiohttp.ClientSession() as session:
-#         async with session.get('https://api.data.gov.sg/v1/transport/traffic-images') as response:
-
-#             # print("Status:", response.status)
-#             # print("Content-type:", response.headers['content-type'])
-
-#             data = await response.json()
-#             # print(data)
-#             return data
-
-
 @asynccontextmanager
 async def lifespan(router: FastAPI):
     # Some task

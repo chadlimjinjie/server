@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WebRTC Video Meeting</title>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/uuid@8.3.2/dist/umd/uuidv4.min.js"></script>
+</head>
+
+<body>
+    <h1>WebRTC Video Meeting</h1>
+    <!-- Input to join an existing room -->
+    <input type="text" id="room-id-input" placeholder="Enter room ID">
+    <button id="join-room">Join Room</button>
+
+    <!-- Button to create a new room -->
+    <button id="create-room">Create Room</button>
+
+    <!-- Display Room ID -->
+    <div id="room-id-display"></div>
+
+    <!-- Video elements for local and remote streams -->
+    <video id="localVideo" autoplay playsinline></video>
+    <div id="remoteVideos"></div> <!-- Remote videos container -->
+
+    <script>
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideos = document.getElementById('remoteVideos');
+        const socket = io();
+        let localStream;
+        let peerConnections = {}; // Keep track of peer connections per user
+        let room_id;
+
+        const servers = {
+            iceServers: [
+                { urls: 'stun:stun.services.mozilla.com' },
+            ]
+        };
+
+        // Button to create a new room
+        document.getElementById('create-room').onclick = async function () {
+            const response = await fetch('/meeting/create-room');
+            const data = await response.json();
+            room_id = data.room_id;
+            document.getElementById('room-id-display').innerText = "Room ID: " + room_id;
+
+            startLocalVideo();
+            socket.emit('join', { room_id });
+            setupSocketEvents();
+        };
+
+        // Button to join an existing room by room_id
+        document.getElementById('join-room').onclick = function () {
+            const inputRoomId = document.getElementById('room-id-input').value;
+            if (inputRoomId) {
+                room_id = inputRoomId;
+                document.getElementById('room-id-display').innerText = "Joined Room ID: " + room_id;
+                startLocalVideo();
+                socket.emit('join', { room_id });
+                setupSocketEvents();
+            } else {
+                alert('Please enter a valid room ID.');
+            }
+        };
+
+        function setupSocketEvents() {
+            // Handle user joining
+            socket.on('user-joined', async ({ sid }) => {
+                console.log(`User ${sid} joined.`);
+                createPeerConnection(sid);
+                if (localStream) {
+                    localStream.getTracks().forEach(track => peerConnections[sid].addTrack(track, localStream));
+                }
+            });
+
+
+            // Handle user leaving
+            socket.on('user-left', ({ sid }) => {
+                console.log(`User ${sid} left.`);
+                closePeerConnection(sid);
+            });
+            socket.on('signal', async (data) => {
+                const { sender, description, candidate } = data;
+                console.log(sender, description, candidate)
+                // If description (SDP offer/answer)
+                if (description) {
+                    // If the description is an offer, create an answer
+                    if (description.type === 'offer') {
+                        createPeerConnection(sender); // Ensure peer connection exists
+                        await peerConnections[sender].setRemoteDescription(new RTCSessionDescription(description));
+                        const answer = await peerConnections[sender].createAnswer();
+                        await peerConnections[sender].setLocalDescription(answer);
+                        socket.emit('signal', { room_id, description: peerConnections[sender].localDescription, sender: socket.id });
+                    } else if (description.type === 'answer') {
+                        // Set remote description to complete handshake
+                        await peerConnections[sender].setRemoteDescription(new RTCSessionDescription(description));
+                    }
+                }
+
+                // If ICE candidate
+                if (candidate) {
+                    await peerConnections[sender].addIceCandidate(new RTCIceCandidate(candidate));
+                }
+            });
+
+        }
+
+        function isMobileDevice() {
+            return /Mobi|Android/i.test(navigator.userAgent);
+        }
+
+
+        const mediaConstraints = {
+            video: {
+                width: { ideal: 640 },
+                height: { ideal: 360 },
+                facingMode: "user"
+            },
+            audio: true
+        };
+
+        function startLocalVideo() {
+            if (isMobileDevice()) {
+                console.log("User is on a mobile device.");
+                navigator.mediaDevices.getUserMedia(mediaConstraints)
+                .then(stream => {
+                    localVideo.srcObject = stream;
+                    localStream = stream;
+
+                    // Add local video and audio tracks to all peer connections
+                    for (let sid in peerConnections) {
+                        stream.getTracks().forEach(track => peerConnections[sid].addTrack(track, stream));
+                    }
+                }).catch(error => console.error(error));
+            } else {
+                console.log("User is on a desktop device.");
+                navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+                .then(stream => {
+                    localVideo.srcObject = stream;
+                    localStream = stream;
+
+                    // Add local video and audio tracks to all peer connections
+                    for (let sid in peerConnections) {
+                        stream.getTracks().forEach(track => peerConnections[sid].addTrack(track, stream));
+                    }
+                }).catch(error => console.error(error));
+            }
+
+        }
+
+
+        function createPeerConnection(sid) {
+            if (!peerConnections[sid]) {
+                const peerConnection = new RTCPeerConnection(servers);
+                peerConnections[sid] = peerConnection;
+
+                // Handle ICE candidates
+                peerConnection.onicecandidate = ({ candidate }) => {
+                    if (candidate) {
+                        socket.emit('signal', { room_id, candidate, sender: socket.id });
+                    }
+                };
+
+                // Handle incoming media streams
+                peerConnection.ontrack = (event) => {
+                    let remoteVideo = document.getElementById(sid);
+                    if (!remoteVideo) {
+                        // Create new video element for each remote peer
+                        remoteVideo = document.createElement('video');
+                        remoteVideo.id = sid;
+                        remoteVideo.autoplay = true;
+                        remoteVideo.playsInline = true;
+                        remoteVideos.appendChild(remoteVideo);
+                    }
+                    remoteVideo.srcObject = event.streams[0]; // Attach the remote stream
+                };
+
+                peerConnection.onnegotiationneeded = async () => {
+                    try {
+                        const offer = await peerConnection.createOffer();
+                        await peerConnection.setLocalDescription(offer);
+                        socket.emit('signal', { room_id, description: peerConnection.localDescription, sender: socket.id });
+                    } catch (error) {
+                        console.error('Error during negotiation:', error);
+                    }
+                };
+            }
+        }
+
+
+        function closePeerConnection(sid) {
+            if (peerConnections[sid]) {
+                peerConnections[sid].close();
+                delete peerConnections[sid];
+                const remoteVideo = document.getElementById(sid);
+                if (remoteVideo) {
+                    remoteVideos.removeChild(remoteVideo);
+                }
+            }
+        }
+    </script>
+</body>
+
+</html>
