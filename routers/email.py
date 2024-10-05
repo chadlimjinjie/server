@@ -15,11 +15,12 @@ async def lifespan(router: FastAPI):
 
 
 router = APIRouter(
+    tags=["Email"],
     prefix="/email",
     lifespan=lifespan
 )
 
 
-@router.get('')
+@router.post('')
 async def read_root():
     return ''

@@ -30,6 +30,7 @@ async def lifespan(router: FastAPI):
 
 
 router = APIRouter(
+    tags=["YouTube"],
     prefix="/youtube",
     lifespan=lifespan
 )

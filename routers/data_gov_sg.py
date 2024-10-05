@@ -5,9 +5,12 @@ https://datamall.lta.gov.sg/content/dam/datamall/datasets/LTA_DataMall_API_User_
 
 '''
 
+import os
 from fastapi import FastAPI, APIRouter
 from contextlib import asynccontextmanager
 import aiohttp
+
+headers = {"AccountKey": os.getenv("LTA_API_KEY")}
 
 data_traffic_images = {}
 data_taxi_availability = {}
@@ -56,7 +59,7 @@ async def get_platform_crowd_density_real_time():
     async with aiohttp.ClientSession() as session:
         for train_line in lines_shorthand_list:
 
-            async with session.get(f'https://datamall2.mytransport.sg/ltaodataservice/PCDRealTime?TrainLine={train_line}', headers={"AccountKey": "ShcXnDanSKqJ53wy47unFg=="}) as response:
+            async with session.get(f'https://datamall2.mytransport.sg/ltaodataservice/PCDRealTime?TrainLine={train_line}', headers=headers) as response:
 
                 # print("Status:", response.status)
                 # print("Content-type:", response.headers['content-type'])
@@ -104,8 +107,5 @@ def read_taxi_availability():
 def platform_crowd_density():
     print(data_platform_crowd_density)
     return data_platform_crowd_density
-
-
-
 
 

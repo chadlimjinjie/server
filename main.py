@@ -20,7 +20,7 @@ import uvicorn
 
 import mongoengine
 
-from routers import data_gov_sg, youtube, meeting
+from routers import data_gov_sg, youtube, meeting, email
 
 
 
@@ -62,22 +62,18 @@ app.add_middleware(
 app.include_router(data_gov_sg.router)
 app.include_router(youtube.router)
 app.include_router(meeting.router)
+app.include_router(email.router)
+
 app.mount("/public", StaticFiles(directory="public"), name="public")
 #Socket io (sio) create a Socket.IO server
 sio = socketio.AsyncServer(cors_allowed_origins='*',async_mode='asgi')
 # wrap with ASGI application
 socket_app = socketio.ASGIApp(sio)
-app.mount("/", socket_app)
+app.mount("/ws", socket_app)
 
 @app.get("/")
 def read_root():
     return RedirectResponse("/docs")
-
-
-# @app.get("/items/{item_id}")
-# def read_item(item_id: int, q: Union[str, None] = None):
-#     return {"item_id": item_id, "q": q}
-
 
 # Socket.IO events
 @sio.event

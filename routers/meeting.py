@@ -19,6 +19,7 @@ async def lifespan(router: FastAPI):
 
 
 router = APIRouter(
+    tags=["Meeting"],
     prefix="/meeting",
     lifespan=lifespan
 )
